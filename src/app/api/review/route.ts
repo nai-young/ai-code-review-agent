@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://116.203.243.128:11434";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
-// Simple in-memory rate limiter: max 10 requests per minute per IP
+// Rate limiter: conservative to stay within Groq free tier (20 req/min)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -33,7 +34,12 @@ function getClientIP(request: Request): string {
 interface Issue {
   id: string;
   severity: "critical" | "warning" | "info";
-  category: "security" | "performance" | "style" | "best-practice" | "type-safety";
+  category:
+    | "security"
+    | "performance"
+    | "style"
+    | "best-practice"
+    | "type-safety";
   line: number;
   message: string;
   suggestion: string;
@@ -51,7 +57,7 @@ interface ReviewResult {
   };
 }
 
-// Fallback rule-based analysis when Ollama is unavailable
+// Fallback rule-based analysis when AI is unavailable
 function analyzeCodeRuleBased(code: string): ReviewResult {
   const lines = code.split("\n");
   const issues: Issue[] = [];
@@ -63,7 +69,7 @@ function analyzeCodeRuleBased(code: string): ReviewResult {
     line: number,
     message: string,
     suggestion: string,
-    codeSnippet: string
+    codeSnippet: string,
   ) => {
     issues.push({
       id: `issue-${++issueId}`,
@@ -84,25 +90,82 @@ function analyzeCodeRuleBased(code: string): ReviewResult {
     const trimmed = line.trim();
 
     if (trimmed.includes("eval(")) {
-      addIssue("critical", "security", lineNum, "Use of eval() detected", "Avoid eval() as it executes arbitrary code. Use safer alternatives.", trimmed);
+      addIssue(
+        "critical",
+        "security",
+        lineNum,
+        "Use of eval() detected",
+        "Avoid eval() as it executes arbitrary code. Use safer alternatives.",
+        trimmed,
+      );
     }
-    if (trimmed.includes("innerHTML") && !trimmed.includes("textContent") && !trimmed.includes("innerText")) {
-      addIssue("critical", "security", lineNum, "Potential XSS via innerHTML", "Use textContent instead of innerHTML, or sanitize input.", trimmed);
+    if (
+      trimmed.includes("innerHTML") &&
+      !trimmed.includes("textContent") &&
+      !trimmed.includes("innerText")
+    ) {
+      addIssue(
+        "critical",
+        "security",
+        lineNum,
+        "Potential XSS via innerHTML",
+        "Use textContent instead of innerHTML, or sanitize input.",
+        trimmed,
+      );
     }
     if (trimmed.includes(": any") || trimmed === "any") {
-      addIssue("warning", "type-safety", lineNum, "Usage of 'any' type", "Replace 'any' with specific types or use 'unknown' with type guards.", trimmed);
+      addIssue(
+        "warning",
+        "type-safety",
+        lineNum,
+        "Usage of 'any' type",
+        "Replace 'any' with specific types or use 'unknown' with type guards.",
+        trimmed,
+      );
     }
     if (/console\.(log|warn|error|debug)\(/.test(trimmed)) {
-      addIssue("warning", "best-practice", lineNum, "Console statement found", "Remove console statements in production code.", trimmed);
+      addIssue(
+        "warning",
+        "best-practice",
+        lineNum,
+        "Console statement found",
+        "Remove console statements in production code.",
+        trimmed,
+      );
     }
     if (/\bvar\s+/.test(trimmed) && !trimmed.includes("//")) {
-      addIssue("warning", "best-practice", lineNum, "Use of 'var' keyword", "Use 'const' or 'let' instead of 'var' for better scoping.", trimmed);
+      addIssue(
+        "warning",
+        "best-practice",
+        lineNum,
+        "Use of 'var' keyword",
+        "Use 'const' or 'let' instead of 'var' for better scoping.",
+        trimmed,
+      );
     }
-    if (/[^=!]==[^=]/.test(trimmed) && !trimmed.includes("===") && !trimmed.includes("//")) {
-      addIssue("warning", "best-practice", lineNum, "Loose equality operator", "Use strict equality (===) instead of loose equality (==).", trimmed);
+    if (
+      /[^=!]==[^=]/.test(trimmed) &&
+      !trimmed.includes("===") &&
+      !trimmed.includes("//")
+    ) {
+      addIssue(
+        "warning",
+        "best-practice",
+        lineNum,
+        "Loose equality operator",
+        "Use strict equality (===) instead of loose equality (==).",
+        trimmed,
+      );
     }
     if (/TODO|FIXME|HACK|XXX/.test(trimmed)) {
-      addIssue("info", "best-practice", lineNum, "Code comment indicates incomplete work", "Address TODO/FIXME comments before merging.", trimmed);
+      addIssue(
+        "info",
+        "best-practice",
+        lineNum,
+        "Code comment indicates incomplete work",
+        "Address TODO/FIXME comments before merging.",
+        trimmed,
+      );
     }
     if (/function\s*\(|=>\s*\{|\{\s*$/.test(line)) {
       inFunction = true;
@@ -111,15 +174,41 @@ function analyzeCodeRuleBased(code: string): ReviewResult {
     if (inFunction && line.includes("}")) {
       const funcLength = lineNum - functionStartLine + 1;
       if (funcLength > 40) {
-        addIssue("warning", "performance", functionStartLine, `Function too long (${funcLength} lines)`, "Break this function into smaller functions. Aim for <20 lines.", trimmed);
+        addIssue(
+          "warning",
+          "performance",
+          functionStartLine,
+          `Function too long (${funcLength} lines)`,
+          "Break this function into smaller functions. Aim for <20 lines.",
+          trimmed,
+        );
       }
       inFunction = false;
     }
     if ((trimmed.match(/callback|=>/g) || []).length >= 3) {
-      addIssue("warning", "best-practice", lineNum, "Potential callback nesting", "Consider using async/await or Promises.", trimmed);
+      addIssue(
+        "warning",
+        "best-practice",
+        lineNum,
+        "Potential callback nesting",
+        "Consider using async/await or Promises.",
+        trimmed,
+      );
     }
-    if (/\b\d{3,}\b/.test(trimmed) && !trimmed.includes("//") && !trimmed.includes("const") && !trimmed.includes("let")) {
-      addIssue("info", "best-practice", lineNum, "Magic number detected", "Extract magic numbers into named constants.", trimmed);
+    if (
+      /\b\d{3,}\b/.test(trimmed) &&
+      !trimmed.includes("//") &&
+      !trimmed.includes("const") &&
+      !trimmed.includes("let")
+    ) {
+      addIssue(
+        "info",
+        "best-practice",
+        lineNum,
+        "Magic number detected",
+        "Extract magic numbers into named constants.",
+        trimmed,
+      );
     }
   });
 
@@ -158,61 +247,79 @@ function analyzeCodeRuleBased(code: string): ReviewResult {
   };
 }
 
-// Attempt Ollama AI review (free, local)
-async function analyzeWithOllama(code: string): Promise<ReviewResult | null> {
-  try {
-    const prompt = `You are a senior code reviewer. Analyze this JavaScript/TypeScript code for security, performance, type safety, and best practices.
+// Groq AI analysis (free tier via API)
+async function analyzeWithGroq(code: string): Promise<ReviewResult | null> {
+  if (!GROQ_API_KEY) return null;
 
-Return ONLY a valid JSON object with this exact structure (no markdown, no explanation):
+  const systemPrompt = `You are a senior software engineer doing a code review.
+Analyze the provided JavaScript/TypeScript code for security, performance, type safety, style, and best practices.
+
+Respond ONLY with a valid JSON object. No markdown, no explanation, no code blocks. Just raw JSON.
+
+Required JSON structure:
 {
-  "score": 0-100,
+  "score": <number 0-100>,
   "summary": "One sentence overview",
   "issues": [
     {
       "severity": "critical|warning|info",
       "category": "security|performance|style|best-practice|type-safety",
-      "line": 1,
-      "message": "Short description",
+      "line": <number>,
+      "message": "Short issue description",
       "suggestion": "How to fix it",
-      "codeSnippet": "The problematic line"
+      "codeSnippet": "The problematic line (max 80 chars)"
     }
   ]
-}
+}`;
 
-Code to analyze:
-\`\`\`
-${code}
-\`\`\`
-`;
-
-    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
       body: JSON.stringify({
-        model: "llama3",
-        prompt,
-        stream: false,
-        options: {
-          temperature: 0.3,
-          num_predict: 2000,
-        },
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Code to review:\n\n\`\`\`\n${code}\n\`\`\``,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 4096,
+        response_format: { type: "json_object" },
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      console.error("Groq API error:", res.status, errorData);
+      return null;
+    }
 
     const data = await res.json();
-    const response = data.response || "";
+    const content = data.choices?.[0]?.message?.content || "";
 
-    // Extract JSON from response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    if (!content) return null;
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    const issues: Issue[] = (parsed.issues || []).map((issue: any, i: number) => ({
+    const parsed = JSON.parse(content);
+    const rawIssues = parsed.issues || [];
+
+    const issues: Issue[] = rawIssues.map((issue: any, i: number) => ({
       id: `issue-${i + 1}`,
-      severity: ["critical", "warning", "info"].includes(issue.severity) ? issue.severity : "info",
-      category: ["security", "performance", "style", "best-practice", "type-safety"].includes(issue.category)
+      severity: ["critical", "warning", "info"].includes(issue.severity)
+        ? issue.severity
+        : "info",
+      category: [
+        "security",
+        "performance",
+        "style",
+        "best-practice",
+        "type-safety",
+      ].includes(issue.category)
         ? issue.category
         : "best-practice",
       line: typeof issue.line === "number" ? issue.line : 0,
@@ -229,7 +336,7 @@ ${code}
     });
 
     return {
-      score: Math.max(0, Math.min(100, parsed.score || 80)),
+      score: Math.max(0, Math.min(100, parsed.score ?? 80)),
       issues,
       summary: parsed.summary || "AI review completed.",
       metrics: {
@@ -238,7 +345,8 @@ ${code}
         issuesBySeverity,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("Groq analysis failed:", err);
     return null;
   }
 }
@@ -256,7 +364,12 @@ export async function POST(request: Request) {
           message: `Maximum ${RATE_LIMIT_MAX} requests per minute. Please wait and try again.`,
           retryAfter: Math.ceil(RATE_LIMIT_WINDOW_MS / 1000),
         },
-        { status: 429, headers: { "Retry-After": String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)) } }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
+          },
+        },
       );
     }
 
@@ -267,13 +380,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 });
     }
 
-    // Try Ollama AI first (free, local)
-    let result = await analyzeWithOllama(code);
+    // Try Groq AI first (free API, no local setup needed)
+    let result = await analyzeWithGroq(code);
 
     // Fallback to rule-based analysis
     if (!result) {
       result = analyzeCodeRuleBased(code);
-      result.summary = "[Rule-based fallback — Ollama AI not available] " + result.summary;
+      result.summary =
+        "[Rule-based fallback, AI service not available] " + result.summary;
     }
 
     return NextResponse.json(result, {
@@ -284,7 +398,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     return NextResponse.json(
       { error: "Failed to analyze code", details: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

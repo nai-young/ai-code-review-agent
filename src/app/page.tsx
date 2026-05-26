@@ -130,9 +130,6 @@ export default function HomePage() {
             AI Code Review Agent · Built with Next.js + TypeScript + Tailwind
             CSS
           </p>
-          <p className="text-xs text-gray-700 mt-1">
-            Part of the AI Portfolio · ED Visa Prep 2026
-          </p>
         </footer>
       </div>
     </div>
