@@ -8,7 +8,12 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
-function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+}
+
+function checkRateLimit(ip: string): RateLimitResult {
   const now = Date.now();
   const record = rateLimitMap.get(ip);
 
@@ -34,12 +39,7 @@ function getClientIP(request: Request): string {
 interface Issue {
   id: string;
   severity: "critical" | "warning" | "info";
-  category:
-    | "security"
-    | "performance"
-    | "style"
-    | "best-practice"
-    | "type-safety";
+  category: "security" | "performance" | "style" | "best-practice" | "type-safety";
   line: number;
   message: string;
   suggestion: string;
@@ -70,7 +70,7 @@ function analyzeCodeRuleBased(code: string): ReviewResult {
     message: string,
     suggestion: string,
     codeSnippet: string,
-  ) => {
+  ): void => {
     issues.push({
       id: `issue-${++issueId}`,
       severity,
@@ -351,7 +351,7 @@ Required JSON structure:
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
     // Rate limiting
     const ip = getClientIP(request);
@@ -395,9 +395,10 @@ export async function POST(request: Request) {
         "X-RateLimit-Remaining": String(rateCheck.remaining),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to analyze code", details: error.message },
+      { error: "Failed to analyze code", details: msg },
       { status: 500 },
     );
   }

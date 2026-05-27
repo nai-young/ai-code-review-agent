@@ -1,17 +1,20 @@
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "AI Code Review Agent",
-  description: "Automated code review powered by AI — security, performance, and best practices",
+  description: "Automated code review powered by Groq AI — security, performance, and best practices",
+  keywords: ["code review", "AI", "static analysis", "security", "TypeScript", "JavaScript"],
+  authors: [{ name: "Naiche" }],
 };
 
-export default function RootLayout({
-  children,
-}: {
+interface RootLayoutProps {
   children: React.ReactNode;
-}) {
+}
+
+export default function RootLayout({ children }: RootLayoutProps): React.JSX.Element {
   return (
     <html lang="en">
       <head>

@@ -1,22 +1,20 @@
 "use client";
 
 import { Shield, Zap, FileCode, Type, Lightbulb } from "lucide-react";
-
-interface Issue {
-  id: string;
-  severity: "critical" | "warning" | "info";
-  category: "security" | "performance" | "style" | "best-practice" | "type-safety";
-  line: number;
-  message: string;
-  suggestion: string;
-  codeSnippet: string;
-}
+import type { Issue, Severity, Category } from "@/lib/types";
 
 interface IssueCardProps {
   issue: Issue;
 }
 
-const severityConfig = {
+interface SeverityConfig {
+  icon: typeof Shield;
+  color: string;
+  dot: string;
+  label: string;
+}
+
+const severityConfig: Record<Severity, SeverityConfig> = {
   critical: {
     icon: Shield,
     color: "bg-red-500/15 text-red-400 border-red-500/25",
@@ -37,7 +35,12 @@ const severityConfig = {
   },
 };
 
-const categoryConfig = {
+interface CategoryConfig {
+  icon: typeof Shield;
+  label: string;
+}
+
+const categoryConfig: Record<Category, CategoryConfig> = {
   security: { icon: Shield, label: "Security" },
   performance: { icon: Zap, label: "Performance" },
   style: { icon: FileCode, label: "Style" },
@@ -45,14 +48,21 @@ const categoryConfig = {
   "type-safety": { icon: Type, label: "Type Safety" },
 };
 
-export default function IssueCard({ issue }: IssueCardProps) {
+export default function IssueCard({ issue }: IssueCardProps): React.JSX.Element {
   const sev = severityConfig[issue.severity];
   const cat = categoryConfig[issue.category];
   const SeverityIcon = sev.icon;
   const CategoryIcon = cat.icon;
 
+  const borderClass =
+    issue.severity === "critical"
+      ? "border-l-red-500"
+      : issue.severity === "warning"
+        ? "border-l-amber-500"
+        : "border-l-blue-500";
+
   return (
-    <div className={`glass glass-hover border-l-4 ${issue.severity === "critical" ? "border-l-red-500" : issue.severity === "warning" ? "border-l-amber-500" : "border-l-blue-500"} group`}>
+    <div className={`glass border-l-4 ${borderClass}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${sev.color}`}>
@@ -78,7 +88,7 @@ export default function IssueCard({ issue }: IssueCardProps) {
       </div>
 
       {issue.codeSnippet && (
-        <div className="mt-4 p-3 rounded-xl bg-black/40 border border-white/[0.06] font-mono text-xs text-gray-400 overflow-x-auto">
+        <div className="mt-4 p-3 rounded-xl bg-[#111118] border border-white/[0.06] font-mono text-xs text-gray-400 overflow-x-auto">
           {issue.codeSnippet}
         </div>
       )}

@@ -1,41 +1,26 @@
 "use client";
 
-import { AlertTriangle, CheckCircle, Info, Code2, FileText } from "lucide-react";
+import { useMemo } from "react";
+import { CheckCircle, FileText } from "lucide-react";
+import type { Issue, ReviewMetrics } from "@/lib/types";
 import IssueCard from "./issue-card";
 
-interface Issue {
-  id: string;
-  severity: "critical" | "warning" | "info";
-  category: "security" | "performance" | "style" | "best-practice" | "type-safety";
-  line: number;
-  message: string;
-  suggestion: string;
-  codeSnippet: string;
-}
-
-interface ReviewResultsProps {
+interface ScoreRingProps {
   score: number;
-  summary: string;
-  issues: Issue[];
-  metrics: {
-    totalLines: number;
-    issuesByCategory: Record<string, number>;
-    issuesBySeverity: Record<string, number>;
-  };
 }
 
-function ScoreRing({ score }: { score: number }) {
-  const getColor = () => {
+function ScoreRing({ score }: ScoreRingProps): React.JSX.Element {
+  const color = useMemo<string>(() => {
     if (score >= 80) return "text-emerald-400";
     if (score >= 60) return "text-amber-400";
     return "text-red-400";
-  };
+  }, [score]);
 
-  const getStroke = () => {
+  const stroke = useMemo<string>(() => {
     if (score >= 80) return "#34d399";
     if (score >= 60) return "#fbbf24";
     return "#f87171";
-  };
+  }, [score]);
 
   const circumference = 2 * Math.PI * 52;
   const strokeDashoffset = circumference - (score / 100) * circumference;
@@ -43,13 +28,20 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <div className="relative w-28 h-28 flex items-center justify-center">
       <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
         <circle
           cx="60"
           cy="60"
           r="52"
           fill="none"
-          stroke={getStroke()}
+          stroke="rgba(255,255,255,0.05)"
+          strokeWidth="8"
+        />
+        <circle
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke={stroke}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -58,17 +50,31 @@ function ScoreRing({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className={`text-3xl font-black ${getColor()}`}>{score}</span>
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">Score</span>
+        <span className={`text-3xl font-black ${color}`}>{score}</span>
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+          Score
+        </span>
       </div>
     </div>
   );
 }
 
-export default function ReviewResults({ score, summary, issues, metrics }: ReviewResultsProps) {
-  const criticalCount = metrics.issuesBySeverity.critical || 0;
-  const warningCount = metrics.issuesBySeverity.warning || 0;
-  const infoCount = metrics.issuesBySeverity.info || 0;
+interface ReviewResultsProps {
+  score: number;
+  summary: string;
+  issues: Issue[];
+  metrics: ReviewMetrics;
+}
+
+export default function ReviewResults({
+  score,
+  summary,
+  issues,
+  metrics,
+}: ReviewResultsProps): React.JSX.Element {
+  const criticalCount = metrics.issuesBySeverity.critical ?? 0;
+  const warningCount = metrics.issuesBySeverity.warning ?? 0;
+  const infoCount = metrics.issuesBySeverity.info ?? 0;
 
   const categoryIcons: Record<string, string> = {
     security: "🔒",
@@ -86,7 +92,9 @@ export default function ReviewResults({ score, summary, issues, metrics }: Revie
           <ScoreRing score={score} />
           <div>
             <h2 className="text-2xl font-bold text-white">Review Results</h2>
-            <p className="text-gray-400 text-sm mt-1 max-w-md leading-relaxed">{summary}</p>
+            <p className="text-gray-400 text-sm mt-1 max-w-md leading-relaxed">
+              {summary}
+            </p>
             <div className="flex items-center gap-4 mt-3">
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
@@ -104,8 +112,12 @@ export default function ReviewResults({ score, summary, issues, metrics }: Revie
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Lines Analyzed</div>
-          <div className="text-xl font-mono font-bold text-white mt-1">{metrics.totalLines}</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider">
+            Lines Analyzed
+          </div>
+          <div className="text-xl font-mono font-bold text-white mt-1">
+            {metrics.totalLines}
+          </div>
         </div>
       </div>
 
@@ -114,9 +126,13 @@ export default function ReviewResults({ score, summary, issues, metrics }: Revie
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {Object.entries(metrics.issuesByCategory).map(([category, count]) => (
             <div key={category} className="glass py-4 px-4 text-center">
-              <div className="text-2xl mb-1">{categoryIcons[category] || "📋"}</div>
+              <div className="text-2xl mb-1">
+                {categoryIcons[category] ?? "📋"}
+              </div>
               <div className="text-lg font-bold text-white">{count}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">{category.replace("-", " ")}</div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+                {category.replace("-", " ")}
+              </div>
             </div>
           ))}
         </div>
@@ -140,7 +156,9 @@ export default function ReviewResults({ score, summary, issues, metrics }: Revie
             <CheckCircle className="w-8 h-8 text-emerald-400" />
           </div>
           <p className="text-xl font-bold text-emerald-400">Clean Code!</p>
-          <p className="text-sm text-gray-500 mt-2">No issues found. Your code looks great.</p>
+          <p className="text-sm text-gray-500 mt-2">
+            No issues found. Your code looks great.
+          </p>
         </div>
       )}
     </div>
