@@ -87,15 +87,15 @@ export default function ReviewResults({
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="glass flex items-center justify-between">
-        <div className="flex items-center gap-5">
+      <div className="glass flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           <ScoreRing score={score} />
-          <div>
+          <div className="text-center sm:text-left">
             <h2 className="text-2xl font-bold text-white">Review Results</h2>
             <p className="text-gray-400 text-sm mt-1 max-w-md leading-relaxed">
               {summary}
             </p>
-            <div className="flex items-center gap-4 mt-3">
+            <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 flex-wrap">
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
                 <span className="text-gray-400">{criticalCount} Critical</span>
@@ -111,7 +111,7 @@ export default function ReviewResults({
             </div>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-center sm:text-right shrink-0">
           <div className="text-xs text-gray-500 uppercase tracking-wider">
             Lines Analyzed
           </div>
