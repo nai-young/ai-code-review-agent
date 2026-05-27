@@ -2,6 +2,13 @@
 
 An automated code review tool powered by **Groq AI** (free API) with a **rule-based fallback**.
 
+<img width="1919" height="847" alt="Screenshot_2026-05-27_01-08-16" src="https://github.com/user-attachments/assets/3528be15-69da-41af-8058-46be33ab5017" />
+
+
+<img width="1678" height="854" alt="Screenshot_2026-05-27_01-12-55" src="https://github.com/user-attachments/assets/2da2c682-e75c-4c00-adca-4114798c8321" />
+
+
+
 ## Overview
 
 This application analyzes JavaScript/TypeScript code in real-time using a real AI model (Llama 3.3 70B via Groq), detecting:
